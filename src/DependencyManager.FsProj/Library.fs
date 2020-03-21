@@ -27,34 +27,39 @@ module Internals =
 
         let projectController = ProjectController(checker)
 
-        member val Name = "FsProj Dependency Manager" with get
-        member val Key = "fsproj" with get
+        member _.Name = "FsProj Dependency Manager"
+        member _.Key = "fsproj"
 
-        member _.ResolveDependencies(scriptExt : ScriptExtension, packageManagerTextLines : HashRLines, tfm: TFM) : (bool * string list * string list * string list) =
-            let fsproj = Seq.head packageManagerTextLines
-
+        member private _.ResolveDependenciesForSingleFsProj(fsproj: string) =
             let res =
                 projectController.LoadProject fsproj ignore FSIRefs.TFM.NetCore (fun _ _ _ -> ())
                 |> Async.RunSynchronously
 
-            let refs, files =
-                match res with
-                | ProjectResponse.Project proj ->
-                    proj.references, proj.projectFiles
-                | ProjectResponse.ProjectError(errorDetails) ->
-                    printfn "ERROR: %A" errorDetails
-                    [], []
-                | ProjectResponse.ProjectLoading(projectFileName) ->
-                    [], []
-                | ProjectResponse.WorkspaceLoad(finished) ->
-                    [], []
+            match res with
+            | ProjectResponse.Project proj ->
+                let refsToWrite =
+                    proj.references
+                    |> List.map (sprintf "#r @\"%s\"")
 
-            let refsToWrite =
-                refs
-                |> List.map (sprintf "#r @\"%s\"")
+                let filePath = IO.Path.ChangeExtension(IO.Path.GetTempFileName (), "fsx")
 
-            let filePath = IO.Path.ChangeExtension(IO.Path.GetTempFileName (), "fsx")
+                let message = sprintf """printfn "Loading files for project %s" """ fsproj
+                let refsToWrite = message::""::""::refsToWrite
 
-            IO.File.WriteAllLines(filePath, refsToWrite)
+                IO.File.WriteAllLines(filePath, refsToWrite)
 
-            (true, List.empty<string>, [filePath; yield! files], List.empty<string> )
+                (true, fsproj, [], [filePath; yield! proj.projectFiles], [])
+
+            | ProjectResponse.ProjectError(errorDetails) ->
+                eprintfn "ERROR: %A" errorDetails
+                (false, fsproj, [], [], [])
+
+            | ProjectResponse.ProjectLoading _
+            | ProjectResponse.WorkspaceLoad _ ->
+                (false, fsproj, [], [], [])
+
+        member self.ResolveDependencies(scriptExt : ScriptExtension, packageManagerTextLines : HashRLines, tfm: TFM) : (bool * string list * string list * string list) =
+            let resolvedDependencies = Seq.map self.ResolveDependenciesForSingleFsProj packageManagerTextLines
+            ((true, [], [], []), resolvedDependencies)
+            ||> Seq.fold (fun (successS, referencesS, filesS, includePathsS) ((success, fsproj, references, files, includePaths)) ->
+                (successS && success), (referencesS @ references), (filesS @ files), (includePathsS @ includePaths))
