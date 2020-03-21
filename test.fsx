@@ -1,4 +1,8 @@
 #r "fsproj: ./test/test.fsproj"
+#r "fsproj: ./test2/test2.fsproj"
 
-let t = test.Say.hello "Chris"
-printfn "RESULT: %s" t
+open Suave
+
+let json = test.Say.hello "Chris"
+
+startWebServer defaultConfig (test2.app json)

@@ -88,6 +88,8 @@ NUGET
     runtime.ubuntu.16.10-x64.runtime.native.System.Security.Cryptography.OpenSsl (4.3.3)
     runtime.ubuntu.18.04-x64.runtime.native.System.Security.Cryptography.OpenSsl (4.3.3)
     Sln (0.3)
+    Suave (2.5.6)
+      FSharp.Core (>= 4.3.4)
     System.Buffers (4.5)
     System.Collections (4.3)
       Microsoft.NETCore.Platforms (>= 1.1)
