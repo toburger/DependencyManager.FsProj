@@ -15,8 +15,8 @@ printfn "RESULT: %s" t
 
 1. Have .Net 5 preview 1 installed
 2. Run `dotnet publish src/DependencyManager.FsProj`
-3. To run sample script from `test.fsx` file run `dotnet fsi --langversion:preview --compilertool:./src/DependencyManager.FsProj/bin/Debug/netstandard2.0/publish test.fsx`
-4. Alternatively, start FSI in interactive mode with `dotnet fsi --langversion:preview --compilertool:./src/DependencyManager.FsProj/bin/Debug/netstandard2.0/publish` and type above script by hand.
+3. To run sample script from `test.fsx` file run `dotnet fsi --langversion:preview --compilertool:./src/DependencyManager.FsProj/bin/Debug/netcoreapp3.1/publish test.fsx`
+4. Alternatively, start FSI in interactive mode with `dotnet fsi --langversion:preview --compilertool:./src/DependencyManager.FsProj/bin/Debug/netcoreapp3.1/publish` and type above script by hand.
 
 ## How to contribute
 
