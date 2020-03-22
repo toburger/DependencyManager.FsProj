@@ -32,7 +32,6 @@ module Internals =
         member _.Key = "fsproj"
 
         member private _.ResolveDependenciesForSingleFsProj(fsproj: string) =
-
             DotNet.restore id fsproj
 
             let res =
@@ -48,14 +47,9 @@ module Internals =
                         Targets = ["Build"] }
                 MSBuild.build setParams proj.projectFileName
 
-                let refsToWrite =
-                    proj.references @ [proj.extra.TargetPath]
-                    |> List.map (sprintf "#r @\"%s\"")
+                let references = proj.references @ [proj.extra.TargetPath]
 
-                let filePath = IO.Path.ChangeExtension(IO.Path.GetTempFileName (), "fsx")
-                IO.File.WriteAllLines(filePath, refsToWrite)
-
-                (true, fsproj, [], [filePath], [])
+                (true, fsproj, references, [], [])
 
             | ProjectResponse.ProjectError(errorDetails) ->
                 eprintfn "ERROR: %A" errorDetails
@@ -65,8 +59,21 @@ module Internals =
             | ProjectResponse.WorkspaceLoad _ ->
                 (false, fsproj, [], [], [])
 
+        member _.FixReferences(success, references, files, includePaths) =
+            let refsToWrite =
+                references
+                |> List.distinct
+                |> List.map (sprintf "#r @\"%s\"")
+
+            let filePath = IO.Path.ChangeExtension(IO.Path.GetTempFileName (), "fsx")
+            IO.File.WriteAllLines(filePath, refsToWrite)
+
+            (success, [], filePath::files, includePaths)
+
         member self.ResolveDependencies(scriptExt : ScriptExtension, packageManagerTextLines : HashRLines, tfm: TFM) : (bool * string list * string list * string list) =
             let resolvedDependencies = Seq.map self.ResolveDependenciesForSingleFsProj packageManagerTextLines
+
             ((true, [], [], []), resolvedDependencies)
             ||> Seq.fold (fun (successS, referencesS, filesS, includePathsS) ((success, fsproj, references, files, includePaths)) ->
                 (successS && success), (referencesS @ references), (filesS @ files), (includePathsS @ includePaths))
+            |> self.FixReferences
