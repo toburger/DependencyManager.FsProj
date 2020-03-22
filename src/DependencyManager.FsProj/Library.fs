@@ -2,6 +2,7 @@
 
 open ProjectSystem
 open FSharp.Compiler.SourceCodeServices
+open Fake.DotNet
 
 module Internals =
     open System
@@ -31,24 +32,30 @@ module Internals =
         member _.Key = "fsproj"
 
         member private _.ResolveDependenciesForSingleFsProj(fsproj: string) =
+
+            DotNet.restore id fsproj
+
             let res =
                 projectController.LoadProject fsproj ignore FSIRefs.TFM.NetCore (fun _ _ _ -> ())
                 |> Async.RunSynchronously
 
             match res with
             | ProjectResponse.Project proj ->
+
+                let setParams (defaults: MSBuildParams) =
+                    { defaults with
+                        Verbosity = Some(Quiet)
+                        Targets = ["Build"] }
+                MSBuild.build setParams proj.projectFileName
+
                 let refsToWrite =
-                    proj.references
+                    proj.references @ [proj.extra.TargetPath]
                     |> List.map (sprintf "#r @\"%s\"")
 
                 let filePath = IO.Path.ChangeExtension(IO.Path.GetTempFileName (), "fsx")
-
-                let message = sprintf """printfn "Loading files for project %s" """ fsproj
-                let refsToWrite = message::""::""::refsToWrite
-
                 IO.File.WriteAllLines(filePath, refsToWrite)
 
-                (true, fsproj, [], [filePath; yield! proj.projectFiles], [])
+                (true, fsproj, [], [filePath], [])
 
             | ProjectResponse.ProjectError(errorDetails) ->
                 eprintfn "ERROR: %A" errorDetails
